@@ -5,8 +5,8 @@ import 'package:phos_core/phos_core.dart';
 
 import '../state/app_model.dart';
 import '../theme/app_theme.dart';
+import '../widgets/compare_preview_box.dart';
 import '../widgets/fidelity_report.dart';
-import '../widgets/preview_box.dart';
 import '../widgets/send_to_camera_card.dart';
 import '../widgets/status_chips.dart';
 
@@ -100,7 +100,7 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
             children: [
-              PreviewBox(
+              ComparePreviewBox(
                 service: m.preview,
                 baseJpeg: m.baseJpeg,
                 params: r.nikon,
@@ -108,7 +108,19 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
                 version: m.previewVersion,
                 borderRadius: 20,
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text(
+                    'Hold the preview to compare with the original',
+                    style: TextStyle(
+                        fontSize: 11, color: AppTheme.textTertiary),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   SourceBadge(recipe: r),

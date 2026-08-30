@@ -96,14 +96,18 @@ class _SendToCameraCardState extends State<SendToCameraCard> {
     }
   }
 
-  Future<void> _refreshSlots() async {
-    if (!_connected) return;
+  /// Re-reads the camera's custom slots. Returns true when the read-back
+  /// succeeded.
+  Future<bool> _refreshSlots() async {
+    if (!_connected) return false;
     try {
       final slots = await _link.pictureControls();
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() => _slots = slots.where((s) => s.slot != null).toList());
+      return true;
     } catch (_) {
       // Listing slots is best-effort; sending still works without it.
+      return false;
     }
   }
 
@@ -124,13 +128,29 @@ class _SendToCameraCardState extends State<SendToCameraCard> {
       _info = null;
     });
     try {
-      await _link.send(widget.recipe, _slot, existing: _slotOccupied);
+      final occupied = _slotOccupied;
+      await _link.send(widget.recipe, _slot, existing: occupied);
+      // Read the slot back: if the camera reports the control we just
+      // registered (by its name), the write is confirmed.
+      final ok = await _refreshSlots();
       if (!mounted) return;
-      setState(() => _info = _slotOccupied
-          ? 'Replaced slot $_slot with “${widget.recipe.name}”.'
-          : '“${widget.recipe.name}” registered in slot $_slot. On the '
-              'camera: Menu → Shooting menu → Picture control → Custom '
-              'Picture Control $_slot (still photo).');
+      String? confirmed;
+      if (ok) {
+        final entry = _slots.where((e) => e.slot == _slot).firstOrNull;
+        if (entry != null &&
+            entry.data.registrationName ==
+                Np3Codec.sanitizeNp3Name(widget.recipe.name)) {
+          confirmed = ' Confirmed on the camera.';
+        } else if (entry != null) {
+          confirmed = ' Slot $_slot is now occupied.';
+        }
+      }
+      setState(() => _info = (occupied
+              ? 'Replaced slot $_slot with “${widget.recipe.name}”.'
+              : '“${widget.recipe.name}” registered in slot $_slot. On the '
+                  'camera: Menu → Shooting menu → Picture control → Custom '
+                  'Picture Control $_slot (still photo).') +
+          (confirmed ?? ''));
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = _message(e));

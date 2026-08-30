@@ -4,6 +4,13 @@
     <uses-feature
         android:name="android.hardware.usb.host"
         android:required="false"/>
+    <!-- Nikon Z cameras expose a UVC video-capture interface next to MTP.
+         Android only grants USB permission for such devices to apps that
+         also hold the CAMERA permission (checked in
+         UsbUserPermissionManager, with no dialog otherwise), so it is
+         requested at connect time even though the app never uses the
+         camera hardware itself. -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <application
         android:label="phos"
         android:name="${applicationName}"

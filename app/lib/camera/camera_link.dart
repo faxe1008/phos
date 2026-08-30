@@ -30,7 +30,11 @@ class CameraLink {
     if (_injected == null) {
       final granted = await UsbMtpTransport.requestPermission(name);
       if (!granted) {
-        throw StateError('USB permission was not granted');
+        throw StateError('Permissions were not granted. Phos asks for camera '
+            'access because Android only lets apps with it use USB devices '
+            'that have a video interface (the Z50II does) — it is never '
+            'used to take photos. It then asks for USB access to the '
+            'camera itself.');
       }
       await UsbMtpTransport.openDevice(name);
     }
