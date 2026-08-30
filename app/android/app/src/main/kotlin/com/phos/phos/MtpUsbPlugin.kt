@@ -83,14 +83,22 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
     // ------------------------------------------------------- FlutterPlugin --
 
     override fun onAttachedToEngine(flutterBinding: FlutterPlugin.FlutterPluginBinding) {
-        binding = flutterBinding
-        val appContext = flutterBinding.applicationContext
-        usb = appContext.getSystemService(Context.USB_SERVICE) as UsbManager
-        if (channel == null) {
-            channel = MethodChannel(flutterBinding.binaryMessenger, CHANNEL)
-            channel?.setMethodCallHandler(this)
+        try {
+            binding = flutterBinding
+            val appContext = flutterBinding.applicationContext
+            usb = appContext.getSystemService(Context.USB_SERVICE) as UsbManager
+            if (channel == null) {
+                channel = MethodChannel(flutterBinding.binaryMessenger, CHANNEL)
+                channel?.setMethodCallHandler(this)
+            }
+            registerReceiverIfNeeded()
+        } catch (e: Exception) {
+            // A broken attach must not take the whole app down; the send
+            // feature simply becomes unavailable until the next attach.
+            Log.e(TAG, "onAttachedToEngine failed", e)
+            channel?.setMethodCallHandler(null)
+            channel = null
         }
-        registerReceiverIfNeeded()
     }
 
     override fun onDetachedFromEngine(flutterBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -105,13 +113,21 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
     // ----------------------------------------------------------- ActivityAware --
 
     override fun onAttachedToActivity(activityBinding: ActivityPluginBinding) {
-        activity = activityBinding.activity
-        registerReceiverIfNeeded()
+        try {
+            activity = activityBinding.activity
+            registerReceiverIfNeeded()
+        } catch (e: Exception) {
+            Log.e(TAG, "onAttachedToActivity failed", e)
+        }
     }
 
     override fun onReattachedToActivityForConfigChanges(activityBinding: ActivityPluginBinding) {
-        activity = activityBinding.activity
-        registerReceiverIfNeeded()
+        try {
+            activity = activityBinding.activity
+            registerReceiverIfNeeded()
+        } catch (e: Exception) {
+            Log.e(TAG, "onReattachedToActivity failed", e)
+        }
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
@@ -127,7 +143,19 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
         val a = activity ?: return
         if (receiverActivity === a) return
         unregisterReceiver()
-        a.registerReceiver(receiver, IntentFilter(ACTION_USB_PERMISSION))
+        // USB_PERMISSION is not a protected broadcast, so on Android 14+
+        // (targeting API 34+) the exported flag is mandatory or the
+        // framework throws SecurityException. The system always may
+        // deliver to a NOT_EXPORTED receiver, so that is the safe choice.
+        if (Build.VERSION.SDK_INT >= 34) {
+            a.registerReceiver(
+                receiver,
+                IntentFilter(ACTION_USB_PERMISSION),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            a.registerReceiver(receiver, IntentFilter(ACTION_USB_PERMISSION))
+        }
         receiverActivity = a
     }
 
