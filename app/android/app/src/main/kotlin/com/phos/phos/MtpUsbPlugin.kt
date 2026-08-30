@@ -1,5 +1,6 @@
 package com.phos.phos
 
+import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -12,9 +13,11 @@ import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.util.Log
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.PluginRegistry
 
 /**
  * Host-side USB transport for the Nikon PTP/MTP protocol.
@@ -27,7 +30,7 @@ import io.flutter.plugin.common.PluginRegistry
  * Expected to be verified against a real Z50II over USB-OTG; the wire
  * protocol itself is covered by unit tests in the core package.
  */
-class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandler {
+class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandler {
 
     companion object {
         const val CHANNEL = "phos.mtp_usb"
@@ -36,9 +39,20 @@ class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandl
 
         private const val CLASS_MASS_STORAGE = 0x06
         private const val SUBCLASS_PTP = 0x01
+
+        // Android 16 (API 36) removed these USB host constants from the
+        // public API (UsbEndpoint.TYPE_BULK, UsbDevice.USB_DIR_IN,
+        // UsbManager.ACTION_USB_PERMISSION). The underlying values and the
+        // runtime permission flow are unchanged, so use them directly.
+        private const val EP_TYPE_BULK = 0x02
+        private const val EP_DIR_IN = 0x80
+        private const val ACTION_USB_PERMISSION =
+            "android.hardware.usb.action.USB_PERMISSION"
     }
 
-    private var activity: Context? = null
+    private var binding: FlutterPlugin.FlutterPluginBinding? = null
+    private var activity: Activity? = null
+    private var receiverActivity: Activity? = null
     private var channel: MethodChannel? = null
     private var usb: UsbManager? = null
 
@@ -52,7 +66,7 @@ class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandl
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, intent: Intent?) {
-            if (intent?.action != UsbManager.ACTION_USB_PERMISSION) return
+            if (intent?.action != ACTION_USB_PERMISSION) return
             val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
             val dev: UsbDevice? = if (Build.VERSION.SDK_INT >= 33) {
                 intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
@@ -66,35 +80,67 @@ class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandl
         }
     }
 
-    // -------------------------------------------------------- ActivityAware --
+    // ------------------------------------------------------- FlutterPlugin --
 
-    override fun onAttachedToActivity(binding: ActivityAware.ActivityBinding) {
-        activity = binding.applicationContext
-        usb = activity?.getSystemService(Context.USB_SERVICE) as UsbManager
-        channel = MethodChannel(binding.binaryMessenger, CHANNEL)
-        channel?.setMethodCallHandler(this)
-        binding.activity
-            .registerReceiver(receiver, IntentFilter(UsbManager.ACTION_USB_PERMISSION))
+    override fun onAttachedToEngine(flutterBinding: FlutterPlugin.FlutterPluginBinding) {
+        binding = flutterBinding
+        val appContext = flutterBinding.applicationContext
+        usb = appContext.getSystemService(Context.USB_SERVICE) as UsbManager
+        if (channel == null) {
+            channel = MethodChannel(flutterBinding.binaryMessenger, CHANNEL)
+            channel?.setMethodCallHandler(this)
+        }
+        registerReceiverIfNeeded()
     }
 
-    override fun onDetachedFromActivity() {
-        activity?.let {
-            try {
-                it.unregisterReceiver(receiver)
-            } catch (_: Exception) {
-            }
-        }
+    override fun onDetachedFromEngine(flutterBinding: FlutterPlugin.FlutterPluginBinding) {
+        binding = null
+        unregisterReceiver()
         closeQuietly()
         channel?.setMethodCallHandler(null)
         channel = null
+        usb = null
+    }
+
+    // ----------------------------------------------------------- ActivityAware --
+
+    override fun onAttachedToActivity(activityBinding: ActivityPluginBinding) {
+        activity = activityBinding.activity
+        registerReceiverIfNeeded()
+    }
+
+    override fun onReattachedToActivityForConfigChanges(activityBinding: ActivityPluginBinding) {
+        activity = activityBinding.activity
+        registerReceiverIfNeeded()
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        unregisterReceiver()
+    }
+
+    override fun onDetachedFromActivity() {
+        unregisterReceiver()
         activity = null
     }
 
-    override fun onAttachedToActivityForConfiguration(binding: ActivityAware.ActivityBinding) {}
+    private fun registerReceiverIfNeeded() {
+        val a = activity ?: return
+        if (receiverActivity === a) return
+        unregisterReceiver()
+        a.registerReceiver(receiver, IntentFilter(ACTION_USB_PERMISSION))
+        receiverActivity = a
+    }
 
-    override fun onDetachedFromActivityForConfiguration() {}
+    private fun unregisterReceiver() {
+        val a = receiverActivity ?: return
+        try {
+            a.unregisterReceiver(receiver)
+        } catch (_: Exception) {
+        }
+        receiverActivity = null
+    }
 
-    // ------------------------------------------------------- method channel --
+    // ---------------------------------------------------------- method channel --
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         try {
@@ -103,12 +149,13 @@ class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandl
                 "requestPermission" ->
                     requestPermission(call.argument<String>("name")!!, result)
                 "open" -> openDevice(call.argument<String>("name")!!, result)
-                "write" ->
-                    writeBytes(
-                        (call.argument<List<Int>>("bytes") ?: throw IllegalArgumentException("bytes"))
-                            .toIntArray().toByteArray(),
-                        result
-                    )
+                "write" -> {
+                    val list =
+                        call.argument<List<Int>>("bytes")
+                            ?: throw IllegalArgumentException("bytes")
+                    val bytes = ByteArray(list.size) { i -> list[i].toByte() }
+                    writeBytes(bytes, result)
+                }
                 "read" -> readBytes(call.argument<Int>("count") ?: 0, result)
                 "recover" -> recover(result)
                 "close" -> {
@@ -129,7 +176,8 @@ class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandl
         for ((name, dev) in m.deviceList) {
             val hasMtp = (0 until dev.interfaceCount).any { i ->
                 val iface = dev.getInterface(i)
-                iface.classId == CLASS_MASS_STORAGE && iface.subclassId == SUBCLASS_PTP
+                iface.interfaceClass == CLASS_MASS_STORAGE &&
+                    iface.interfaceSubclass == SUBCLASS_PTP
             }
             if (hasMtp) {
                 val label = listOfNotNull(dev.manufacturerName, dev.productName)
@@ -150,7 +198,8 @@ class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandl
     }
 
     private fun requestPermission(name: String, result: MethodChannel.Result) {
-        val ctx = activity ?: throw IllegalStateException("not attached")
+        val ctx = binding?.applicationContext
+            ?: throw IllegalStateException("not attached")
         val m = usb ?: throw IllegalStateException("no UsbManager")
         val dev = m.deviceList[name] ?: throw IllegalStateException("device not found: $name")
         if (m.hasPermission(dev)) {
@@ -162,14 +211,13 @@ class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandl
         val pi = PendingIntent.getBroadcast(
             ctx,
             0,
-            Intent(UsbManager.ACTION_USB_PERMISSION),
+            Intent(ACTION_USB_PERMISSION),
             flags
         )
-        if (!m.requestPermission(dev, pi)) {
-            permissionResult = null
-            throw IllegalStateException("requestPermission refused")
-        }
-        // The result is delivered asynchronously by the receiver.
+        // On API 36 requestPermission returns void; a refusal (or an
+        // ignored dialog) simply never delivers the broadcast, in which
+        // case the Dart side times out waiting for the channel reply.
+        m.requestPermission(dev, pi)
     }
 
     private fun openDevice(name: String, result: MethodChannel.Result) {
@@ -183,12 +231,12 @@ class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandl
         val ifaces = (0 until dev.interfaceCount).map { dev.getInterface(it) }
         val iface =
             ifaces.firstOrNull {
-                it.classId == CLASS_MASS_STORAGE &&
-                    it.subclassId == SUBCLASS_PTP &&
-                    it.protocolId == 0x01
+                it.interfaceClass == CLASS_MASS_STORAGE &&
+                    it.interfaceSubclass == SUBCLASS_PTP &&
+                    it.interfaceProtocol == 0x01
             }
                 ?: ifaces.firstOrNull {
-                    it.classId == CLASS_MASS_STORAGE && it.subclassId == SUBCLASS_PTP
+                    it.interfaceClass == CLASS_MASS_STORAGE && it.interfaceSubclass == SUBCLASS_PTP
                 }
                 ?: throw IllegalStateException("no MTP interface on $name")
         if (!conn.claimInterface(iface, true)) {
@@ -199,8 +247,8 @@ class MtpUsbPlugin : PluginRegistry.ActivityAware, MethodChannel.MethodCallHandl
         var outEp: UsbEndpoint? = null
         for (i in 0 until iface.endpointCount) {
             val ep = iface.getEndpoint(i)
-            if (ep.type != UsbEndpoint.TYPE_BULK) continue
-            if ((ep.direction and UsbDevice.USB_DIR_IN) != 0) {
+            if (ep.type != EP_TYPE_BULK) continue
+            if ((ep.direction and EP_DIR_IN) != 0) {
                 inEp = inEp ?: ep
             } else {
                 outEp = outEp ?: ep

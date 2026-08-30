@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [master, main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -80,3 +81,48 @@ jobs:
           name: phos-debug-arm64
           path: app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
+
+  publish:
+    name: publish release
+    if: github.event_name != 'pull_request'
+    needs: apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: phos-debug-arm64
+          path: out
+
+      - name: Resolve release name
+        id: rel
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            # Tagged build: the tag is the release name.
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            # Branch build: name it after the build number from pubspec.
+            build=$(sed -n 's/^version: .*+\([0-9][0-9]*\)$/\1/p' app/pubspec.yaml)
+            echo "name=Build ${build}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk=out/app-debug.apk
+          if gh release view "${{ steps.rel.outputs.name }}" >/dev/null 2>&1; then
+            gh release upload "${{ steps.rel.outputs.name }}" "$apk" --clobber
+          else
+            gh release create "${{ steps.rel.outputs.name }}" \
+              --title "${{ steps.rel.outputs.name }}" \
+              --notes "phos ${{ steps.rel.outputs.name }} — built from ${{ github.ref_name }} (${{ github.sha }})" \
+              ${{ steps.rel.outputs.prerelease == 'true' && '--prerelease' || '' }} \
+              "$apk"
+          fi

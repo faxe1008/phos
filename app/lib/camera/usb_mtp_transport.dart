@@ -47,10 +47,16 @@ class UsbMtpTransport implements UsbTransport {
 
   /// Ask the system for USB access to [name]; resolves true when granted
   /// (or already granted).
-  static Future<bool> requestPermission(String name) async {
-    final r = await _channel.invokeMethod<bool>('requestPermission', {
-      'name': name,
-    });
+  ///
+  /// The OS permission dialog is not guaranteed to answer (e.g. the user
+  /// walks away), so wait at most [permissionTimeout].
+  static Future<bool> requestPermission(
+    String name, {
+    Duration permissionTimeout = const Duration(seconds: 60),
+  }) async {
+    final r = await _channel
+        .invokeMethod<bool>('requestPermission', {'name': name})
+        .timeout(permissionTimeout, onTimeout: () => false);
     return r ?? false;
   }
 
