@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- phos (φως): light. A glowing phi (φ) — the letter that opens the
+       Greek word — in warm gold on near-black, like a single point of
+       light. Design source for the launcher icons (render with
+       rsvg-convert -w <px> -h <px> out.png). -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="80%">
+      <stop offset="0%" stop-color="#17171F"/>
+      <stop offset="100%" stop-color="#0B0B0F"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#E8A33D" stop-opacity="0.35"/>
+      <stop offset="60%" stop-color="#E8A33D" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#E8A33D" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="88" x2="0" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F6C768"/>
+      <stop offset="55%" stop-color="#E8A33D"/>
+      <stop offset="100%" stop-color="#C07A12"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256" cy="268" r="210" fill="url(#glow)"/>
+  <g fill="none" stroke="url(#gold)" stroke-width="36" stroke-linecap="round">
+    <circle cx="256" cy="268" r="112"/>
+    <line x1="256" y1="88" x2="256" y2="448"/>
+  </g>
+</svg>

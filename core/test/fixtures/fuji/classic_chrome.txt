@@ -1,0 +1,14 @@
+Classic Chrome
+Dynamic Range: DR200
+Highlight: +1
+Shadow: -2
+Color: +2
+Noise Reduction: -4
+Sharpening: +1
+Clarity: +3
+Grain Effect: Weak, Small
+Color Chrome Effect: Strong
+Color Chrome Effect Blue: Weak
+White Balance: Daylight, +2 Red & -5 Blue
+ISO: Auto, up to ISO 6400
+Exposure Compensation: 0 to +2/3 (typically)

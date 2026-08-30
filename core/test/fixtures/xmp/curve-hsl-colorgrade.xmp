@@ -1,0 +1,40 @@
+<?xpacket begin="﻿" id="W5M0MpChcGiynhqT"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+   dc:description="Curve + HSL + new color grade. The curve must supersede the tonal sliders."
+   crs:ProcessVersion="11.0"
+   crs:WhiteBalance="Cloudy"
+   crs:Temp="6200"
+   crs:Tint="-3"
+   crs:Contrast2012="15"
+   crs:Highlights2012="-10"
+   crs:Shadows2012="25"
+   crs:Whites2012="5"
+   crs:Blacks2012="-10"
+   crs:Saturation="10"
+   crs:Clarity2012="-10"
+   crs:ToneCurvePV2012="0 0, 18 14, 64 60, 128 132, 200 205, 255 255"
+   crs:RedHue="-12"
+   crs:RedSaturation="8"
+   crs:RedLuminance="-6"
+   crs:GreenSaturation="15"
+   crs:BlueLuminance="4"
+   crs:ColorGradeMidtoneHue="35"
+   crs:ColorGradeMidtoneSat="62"
+   crs:ColorGradeMidtoneLum="2"
+   crs:ColorGradeShadowHue="200"
+   crs:ColorGradeShadowSat="45"
+   crs:ColorGradeHighlightHue="50"
+   crs:ColorGradeHighlightSat="58">
+  </rdf:Description>
+  <rdf:Description rdf:about=""
+   xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+   crs:Name="Curve + Grade"
+   crs:HasSettings="True">
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>

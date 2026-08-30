@@ -1,0 +1,31 @@
+<?xpacket begin="﻿" id="W5M0MpChcGiynhqT"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+   dc:description="Legacy process-version preset with split toning and sharpening."
+   crs:ProcessVersion="1.4"
+   crs:WhiteBalance="Tungsten"
+   crs:Contrast="20"
+   crs:Highlights="-30"
+   crs:Shadows="10"
+   crs:Saturation="-25"
+   crs:Clarity="15"
+   crs:SplitToningShadowHue="250"
+   crs:SplitToningShadowSaturation="25"
+   crs:SplitToningHighlightHue="40"
+   crs:SplitToningHighlightSaturation="15"
+   crs:SplitToningBalance="5"
+   crs:Sharpening="40"
+   crs:GrainAmount="15"
+   crs:PostCropVignetteAmount="-10">
+  </rdf:Description>
+  <rdf:Description rdf:about=""
+   xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+   crs:Name="Legacy Split"
+   crs:HasSettings="True">
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>

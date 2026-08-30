@@ -1,0 +1,31 @@
+# OS / editors
+.DS_Store
+*.swp
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Dart / Flutter
+**/.dart_tool/
+**/.pub-cache/
+**/.pub/
+**/doc/api/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/ios/Flutter/.last_build_id
+
+# Flutter build artifacts
+**/build/
+app.*.symbols
+app.*.map.json
+
+# Android / Gradle
+**/.gradle/
+app/android/local.properties
+
+# Reference material: Nikon SDK docs are proprietary and too large for git.
+data/*.zip
