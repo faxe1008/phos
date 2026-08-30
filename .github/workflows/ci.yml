@@ -121,8 +121,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           apk=out/app-debug.apk
-          if gh release view "${{ steps.rel.outputs.name }}" >/dev/null 2>&1; then
-            gh release upload "${{ steps.rel.outputs.name }}" "$apk" --clobber
+          # Check by tag (the release's unique key), not by name:
+          # "gh release view" does not reliably match release names.
+          if gh release view "${{ steps.rel.outputs.tag }}" >/dev/null 2>&1; then
+            gh release upload "${{ steps.rel.outputs.tag }}" "$apk" --clobber
           else
             gh release create "${{ steps.rel.outputs.tag }}" \
               --title "${{ steps.rel.outputs.name }}" \
