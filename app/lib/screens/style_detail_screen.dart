@@ -7,6 +7,7 @@ import '../state/app_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/compare_preview_box.dart';
 import '../widgets/fidelity_report.dart';
+import 'style_editor_screen.dart';
 import '../widgets/send_to_camera_card.dart';
 import '../widgets/status_chips.dart';
 
@@ -29,6 +30,49 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(path == null ? 'Cancelled.' : 'Saved to $path')),
     );
+  }
+
+  /// Editing works on a copy (originals are immutable): duplicate the style,
+  /// replace this screen with the editor, and — on save — jump to the
+  /// detail screen of the edited copy. An unsaved editor drops the copy.
+  Future<void> _edit() async {
+    final m = widget.model;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceHigh,
+        title: const Text('Edit a copy?'),
+        content: const Text(
+          'Styles are versioned — the original is never modified. '
+          'Phos will create an editable copy of this style.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Create copy')),
+        ],
+      ),
+    );
+    if (proceed != true || !mounted) return;
+    final copy = m.duplicateForEditing(widget.recipe);
+    if (!mounted) return;
+    final saved = await Navigator.of(context)
+        .pushReplacement<UniversalRecipe, void>(
+          MaterialPageRoute<UniversalRecipe>(
+              builder: (_) => StyleEditorScreen(model: m, recipe: copy)),
+        );
+    if (saved == null) {
+      // Cancelled: drop the unused copy.
+      m.remove(copy);
+    } else if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+            builder: (_) => StyleDetailScreen(model: m, recipe: saved)),
+      );
+    }
   }
 
   Future<void> _delete() async {
@@ -79,6 +123,11 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
           appBar: AppBar(
             title: Text(r.name),
             actions: [
+              IconButton(
+                tooltip: 'Duplicate and edit',
+                icon: const Icon(Icons.tune),
+                onPressed: _edit,
+              ),
               IconButton(
                 tooltip:
                     r.favorites ? 'Remove from favorites' : 'Add to favorites',

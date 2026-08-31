@@ -91,38 +91,46 @@ class _ComparePreviewBoxState extends State<ComparePreviewBox> {
       onLongPressCancel: () => _setComparing(false),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(widget.borderRadius),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            PreviewBox(
-              service: widget.service,
-              baseJpeg: widget.baseJpeg,
-              params: widget.params,
-              width: widget.width,
-              version: widget.version,
-              borderRadius: widget.borderRadius,
-            ),
-            if (_comparing && _plain != null)
-              Image.memory(_plain!, fit: BoxFit.cover),
-            if (_comparing && _plain == null)
-              Container(
-                color: AppTheme.surfaceHigh,
-                child: const Center(
-                  child: SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppTheme.seed),
+        // Fixed 4:3 ratio so the box has a definite size both in a
+        // ListView (unbounded height — StackFit.expand alone would throw)
+        // and in tests (mock image decoders report 1x1).
+        child: AspectRatio(
+          aspectRatio: 4 / 3,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              PreviewBox(
+                service: widget.service,
+                baseJpeg: widget.baseJpeg,
+                params: widget.params,
+                width: widget.width,
+                version: widget.version,
+                borderRadius: widget.borderRadius,
+              ),
+              if (_comparing && _plain != null)
+                Image.memory(_plain!, fit: BoxFit.cover),
+              if (_comparing && _plain == null)
+                Positioned.fill(
+                  child: Container(
+                    color: AppTheme.surfaceHigh,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppTheme.seed),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            if (_comparing)
-              Positioned(
-                top: 10,
-                left: 10,
-                child: _chip('Original'),
-              ),
-          ],
+              if (_comparing)
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: _chip('Original'),
+                ),
+            ],
+          ),
         ),
       ),
     );

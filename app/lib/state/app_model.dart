@@ -234,6 +234,36 @@ class AppModel extends ChangeNotifier {
     }
   }
 
+  /// Create an editable user copy of [recipe].
+  ///
+  /// Source recipes are immutable (design rule: the original artifact is
+  /// never modified), so "edit" always means "work on a copy". The copy is
+  /// added to the import library and returned for editing.
+  UniversalRecipe duplicateForEditing(UniversalRecipe recipe) {
+    var name = recipe.name;
+    var n = 2;
+    while (allStyles.any((s) => s.name == name)) {
+      name = '${recipe.name} ($n)';
+      n++;
+    }
+    final copy = recipe.copyWith(name: name, sourceFormat: SourceFormat.user);
+    // The copy is no longer that artifact.
+    copy.id = 'user:$name-${DateTime.now().microsecondsSinceEpoch}';
+    copy.checksumSha256 = null;
+    copy.sourceUri = null;
+    _imports.add(copy);
+    _persist();
+    notifyListeners();
+    return copy;
+  }
+
+  /// Persist the edited [recipe] (an object in the import library).
+  void saveEdited(UniversalRecipe recipe) {
+    recipe.modifiedAt = DateTime.now();
+    _persist();
+    notifyListeners();
+  }
+
   /// Add [recipe] to the import library. Returns false (and sets an error)
   /// when a recipe with the same source checksum is already present.
   bool addRecipe(UniversalRecipe recipe) {
