@@ -214,11 +214,7 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
                     requestPermission(call.argument<String>("name")!!, result)
                 "open" -> openDevice(call.argument<String>("name")!!, result)
                 "write" -> {
-                    val list =
-                        call.argument<List<Int>>("bytes")
-                            ?: throw IllegalArgumentException("bytes")
-                    val bytes = ByteArray(list.size) { i -> list[i].toByte() }
-                    writeBytes(bytes, result)
+                    writeBytes(readByteArgument(call.argument<Any?>("bytes")), result)
                 }
                 "read" -> readBytes(call.argument<Int>("count") ?: 0, result)
                 "recover" -> recover(result)
@@ -231,6 +227,20 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
         } catch (e: Exception) {
             Log.w(TAG, "method ${call.method} failed", e)
             result.error("MtpError", e.message ?: e.javaClass.simpleName, null)
+        }
+    }
+
+    /** StandardMessageCodec uses byte[] for Dart Uint8List and List<Int> for
+     * ordinary lists. Accept both because the transport API can provide either
+     * representation depending on how the Dart payload was constructed. */
+    private fun readByteArgument(value: Any?): ByteArray {
+        return when (value) {
+            is ByteArray -> value
+            is List<*> -> ByteArray(value.size) { i ->
+                (value[i] as? Number)?.toInt()?.toByte()
+                    ?: throw IllegalArgumentException("bytes[$i] is not numeric")
+            }
+            else -> throw IllegalArgumentException("bytes must be byte[] or list")
         }
     }
 
