@@ -72,19 +72,17 @@ abstract final class CurveBuilder {
   }
 
   /// Sorts and de-duplicates [raw], then returns:
-///
-///   * the x-sorted table used to interpolate the LUT (anchored at (0,0) and
-///     (255,255)), and
-///   * the point list in NP3 chunk order (user points ascending, then the
-///     white anchor (255,255) and finally the black anchor (0,0)).
+  ///
+  ///   * the x-sorted table used to interpolate the LUT (anchored at (0,0) and
+  ///     (255,255)), and
+  ///   * the point list in NP3 chunk order (user points ascending, then the
+  ///     white anchor (255,255) and finally the black anchor (0,0)).
   static (List<Point>, List<Point>) _normalize(List<Point> raw) {
     final byX = <int, Point>{};
     for (final p in raw) {
       byX[p.x.clamp(0, 255)] = Point(p.x.clamp(0, 255), p.y.clamp(0, 255));
     }
-    var pts = byX.entries
-        .map((e) => e.value)
-        .toList()
+    var pts = byX.entries.map((e) => e.value).toList()
       ..sort((a, b) => a.x.compareTo(b.x));
 
     if (pts.isEmpty) pts = [Point(0, 0), Point(255, 255)];
@@ -104,15 +102,63 @@ abstract final class CurveBuilder {
     final a = pts[idx];
     final b = pts[idx + 1];
     if (b.x == a.x) return b.y.toDouble();
+    final h = <double>[];
+    final delta = <double>[];
+    for (var i = 1; i < pts.length; i++) {
+      h.add((pts[i].x - pts[i - 1].x).toDouble());
+      delta.add((pts[i].y - pts[i - 1].y) / h.last);
+    }
+    final d = _monotonicSlopes(h, delta);
     final t = (x - a.x) / (b.x - a.x);
-    return a.y + t * (b.y - a.y);
+    final y0 = a.y.toDouble();
+    final y1 = b.y.toDouble();
+    final m0 = d[idx] * h[idx];
+    final m1 = d[idx + 1] * h[idx];
+    final t2 = t * t;
+    final t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * y0 +
+        (t3 - 2 * t2 + t) * m0 +
+        (-2 * t3 + 3 * t2) * y1 +
+        (t3 - t2) * m1;
+  }
+
+  /// Fritsch-Carlson slopes: smooth between points without overshooting a
+  /// monotonic segment, which keeps the exported camera LUT monotonic.
+  static List<double> _monotonicSlopes(List<double> h, List<double> delta) {
+    final d = List<double>.filled(delta.length + 1, 0);
+    if (delta.length == 1) {
+      d[0] = delta[0];
+      d[1] = delta[0];
+      return d;
+    }
+    for (var i = 1; i < delta.length; i++) {
+      if (delta[i - 1] * delta[i] <= 0) {
+        d[i] = 0;
+      } else {
+        final w1 = 2 * h[i] + h[i - 1];
+        final w2 = h[i] + 2 * h[i - 1];
+        d[i] = (w1 + w2) / (w1 / delta[i - 1] + w2 / delta[i]);
+      }
+    }
+    d[0] = _endpointSlope(h[0], h[1], delta[0], delta[1]);
+    d[d.length - 1] = _endpointSlope(
+        h.last, h[h.length - 2], delta.last, delta[delta.length - 2]);
+    return d;
+  }
+
+  static double _endpointSlope(double h0, double h1, double d0, double d1) {
+    var out = ((2 * h0 + h1) * d0 - h0 * d1) / (h0 + h1);
+    if (out * d0 <= 0) return 0;
+    if (d0 * d1 < 0 && out.abs() > 3 * d0.abs()) out = 3 * d0;
+    return out;
   }
 
   /// Build a curve by adding [highlightShift] to the upper half and
   /// [shadowShift] to the lower half of an identity LUT (Fujifilm-style).
   /// Shifts are in 0..32767 output units at the extreme end, tapering to 0 at
   /// the midpoint.
-  static ToneCurve fromHighlightShadow(double highlightShift, double shadowShift) {
+  static ToneCurve fromHighlightShadow(
+      double highlightShift, double shadowShift) {
     final lut = <int>[];
     var running = 0;
     for (var i = 0; i < 256; i++) {

@@ -13,13 +13,16 @@ import 'package:phos_core/phos_core.dart';
 /// a style's thumbnail reads the way the camera would apply it.
 abstract final class NikonPreviewFilter {
   /// Apply [params] to [source], returning a new image.
-  static img.Image apply(img.Image source, NikonParams params,
-      {int? width}) {
+  static img.Image apply(img.Image source, NikonParams params, {int? width}) {
     var img2 = source;
     if (width != null && source.width != width) {
       final h = (source.height * width / source.width).round();
-      img2 = img.copyResize(source,
-          width: width, height: h.clamp(1, 100000), interpolation: img.Interpolation.linear);
+      img2 = img.copyResize(
+        source,
+        width: width,
+        height: h.clamp(1, 100000),
+        interpolation: img.Interpolation.linear,
+      );
     }
 
     final lut = buildMasterLut(params);
@@ -50,22 +53,31 @@ abstract final class NikonPreviewFilter {
         g += addG;
         b += addB;
 
-        // Split-toning style color grading.
+        // Split-toning style color grading. The tint scales with the zone's
+        // chroma; the brightness shift applies on its own so a
+        // brightness-only zone is visible.
         final l2 = 0.299 * r + 0.587 * g + 0.114 * b;
         for (final zd in grades) {
-          if (zd.weight(l2) <= 0.001) continue;
-          final w = zd.weight(l2) * zd.strength * blendScale;
-          if (w <= 0) continue;
-          r += (zd.tintR - r) * w + zd.shift * w;
-          g += (zd.tintG - g) * w + zd.shift * w;
-          b += (zd.tintB - b) * w + zd.shift * w;
+          final zw = zd.weight(l2) * blendScale;
+          if (zw <= 0.001) continue;
+          final w = zw * zd.strength;
+          r += (zd.tintR - r) * w;
+          g += (zd.tintG - g) * w;
+          b += (zd.tintB - b) * w;
+          if (zd.shift != 0) {
+            r += zd.shift * zw;
+            g += zd.shift * zw;
+            b += zd.shift * zw;
+          }
         }
 
         img2.setPixelRgb(
-            x, y,
-            r.clamp(0, 255).round(),
-            g.clamp(0, 255).round(),
-            b.clamp(0, 255).round());
+          x,
+          y,
+          r.clamp(0, 255).round(),
+          g.clamp(0, 255).round(),
+          b.clamp(0, 255).round(),
+        );
       }
     }
 
@@ -128,7 +140,7 @@ abstract final class NikonPreviewFilter {
   // ------------------------------------------------------------- helpers --
 
   static (double r, double g, double b, double addR, double addG, double addB)
-      _blenderGains(Map<String, ColorChannel>? ch) {
+  _blenderGains(Map<String, ColorChannel>? ch) {
     const dirs = {
       'red': (1.0, 0.15, 0.15),
       'orange': (1.0, 0.5, 0.1),
@@ -166,15 +178,20 @@ abstract final class NikonPreviewFilter {
     for (final n in names) {
       final z = zones[n];
       if (z == null || z.isNeutral) continue;
-      final (tr, tg, tb) = _hslToRgb(z.hue.toDouble(), (z.chroma.abs() / 100.0).clamp(0, 1));
-      out.add(_Zone(
-        tintR: tr,
-        tintG: tg,
-        tintB: tb,
-        shift: z.brightness / 100.0 * 0.3,
-        strength: (z.chroma.abs() / 100.0).clamp(0, 1) * 0.6,
-        weight: _zoneWeight(n),
-      ));
+      final (tr, tg, tb) = _hslToRgb(
+        z.hue.toDouble(),
+        (z.chroma.abs() / 100.0).clamp(0, 1),
+      );
+      out.add(
+        _Zone(
+          tintR: tr,
+          tintG: tg,
+          tintB: tb,
+          shift: z.brightness / 100.0 * 0.3,
+          strength: (z.chroma.abs() / 100.0).clamp(0, 1) * 0.6,
+          weight: _zoneWeight(n),
+        ),
+      );
     }
     return out;
   }
@@ -215,19 +232,23 @@ abstract final class NikonPreviewFilter {
   /// Light unsharp mask: out = in + (in - blurred) * amount.
   static img.Image _unsharp(img.Image src, {required double amount}) {
     final blurred = img.gaussianBlur(src, radius: 1);
-    final out = img.copyResize(src,
-        width: src.width,
-        height: src.height,
-        interpolation: img.Interpolation.nearest);
+    final out = img.copyResize(
+      src,
+      width: src.width,
+      height: src.height,
+      interpolation: img.Interpolation.nearest,
+    );
     for (var y = 0; y < out.height; y++) {
       for (var x = 0; x < out.width; x++) {
         final o = out.getPixel(x, y);
         final bl = blurred.getPixel(x, y);
         out.setPixelRgb(
-            x, y,
-            (o.r + (o.r - bl.r) * amount).clamp(0, 255).round(),
-            (o.g + (o.g - bl.g) * amount).clamp(0, 255).round(),
-            (o.b + (o.b - bl.b) * amount).clamp(0, 255).round());
+          x,
+          y,
+          (o.r + (o.r - bl.r) * amount).clamp(0, 255).round(),
+          (o.g + (o.g - bl.g) * amount).clamp(0, 255).round(),
+          (o.b + (o.b - bl.b) * amount).clamp(0, 255).round(),
+        );
       }
     }
     return out;
@@ -235,13 +256,14 @@ abstract final class NikonPreviewFilter {
 }
 
 class _Zone {
-  const _Zone(
-      {required this.tintR,
-      required this.tintG,
-      required this.tintB,
-      required this.shift,
-      required this.strength,
-      required this.weight});
+  const _Zone({
+    required this.tintR,
+    required this.tintG,
+    required this.tintB,
+    required this.shift,
+    required this.strength,
+    required this.weight,
+  });
   final double tintR, tintG, tintB, shift, strength;
   final double Function(double luma) weight;
 }

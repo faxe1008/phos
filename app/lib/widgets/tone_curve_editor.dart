@@ -42,11 +42,12 @@ class _ToneCurveEditorState extends State<ToneCurveEditor> {
   static const Point _black = Point(0, 0);
   static const Point _white = Point(255, 255);
 
-  static List<Point> _userPoints(Iterable<Point> pts) => pts
-      .where((p) => p.x > 0 && p.x < 255)
-      .map((p) => Point(p.x, p.y))
-      .toList()
-    ..sort((a, b) => a.x.compareTo(b.x));
+  static List<Point> _userPoints(Iterable<Point> pts) =>
+      pts
+          .where((p) => p.x > 0 && p.x < 255)
+          .map((p) => Point(p.x, p.y))
+          .toList()
+        ..sort((a, b) => a.x.compareTo(b.x));
 
   @override
   void initState() {
@@ -100,9 +101,10 @@ class _ToneCurveEditorState extends State<ToneCurveEditor> {
     var bestDist = 16.0;
     for (var i = 0; i < _points.length; i++) {
       final p = _points[i];
-      final d = (Offset(p.x / 255 * widget.size, (1 - p.y / 255) * widget.size) -
-            local)
-        .distance;
+      final d =
+          (Offset(p.x / 255 * widget.size, (1 - p.y / 255) * widget.size) -
+                  local)
+              .distance;
       if (d < bestDist) {
         bestDist = d;
         best = i;
@@ -133,9 +135,9 @@ class _ToneCurveEditorState extends State<ToneCurveEditor> {
   }
 
   // The grab must be resolved at pointer-down: once a pan wins the arena,
-// the pointer is already past the touch slop, so a hit test at the win
-// position misses the point under the finger.
-void _onPanDown(DragDownDetails d) {
+  // the pointer is already past the touch slop, so a hit test at the win
+  // position misses the point under the finger.
+  void _onPanDown(DragDownDetails d) {
     _pendingGrab = _hit(_local(d.globalPosition));
   }
 
@@ -241,12 +243,26 @@ class _CurvePainter extends CustomPainter {
     final path = Path();
     var cur = px(const Point(0, 0));
     path.moveTo(cur.dx, cur.dy);
-    for (final p in points) {
-      cur = px(p);
-      path.lineTo(cur.dx, cur.dy);
+    final all = [const Point(0, 0), ...points, const Point(255, 255)];
+    final slopes = _slopes(all);
+    for (var i = 0; i < all.length - 1; i++) {
+      final a = all[i];
+      final b = all[i + 1];
+      final h = (b.x - a.x).toDouble();
+      if (h <= 0) continue;
+      final p0 = px(a);
+      final p1 = px(b);
+      final m0 = slopes[i] * h;
+      final m1 = slopes[i + 1] * h;
+      path.cubicTo(
+        p0.dx + h / 3 * s / 255,
+        p0.dy - m0 / 3 * s / 255,
+        p1.dx - h / 3 * s / 255,
+        p1.dy + m1 / 3 * s / 255,
+        p1.dx,
+        p1.dy,
+      );
     }
-    cur = px(const Point(255, 255));
-    path.lineTo(cur.dx, cur.dy);
     final stroke = Paint()
       ..color = AppTheme.seed
       ..strokeWidth = 2
@@ -262,6 +278,27 @@ class _CurvePainter extends CustomPainter {
     for (var i = 0; i < points.length; i++) {
       canvas.drawCircle(px(points[i]), i == dragIndex ? 7 : 5, dot);
     }
+  }
+
+  List<double> _slopes(List<Point> pts) {
+    final h = <double>[];
+    final delta = <double>[];
+    for (var i = 1; i < pts.length; i++) {
+      h.add((pts[i].x - pts[i - 1].x).toDouble());
+      delta.add((pts[i].y - pts[i - 1].y) / h.last);
+    }
+    final d = List<double>.filled(pts.length, 0);
+    if (delta.length == 1) return [delta[0], delta[0]];
+    for (var i = 1; i < delta.length; i++) {
+      if (delta[i - 1] * delta[i] > 0) {
+        final w1 = 2 * h[i] + h[i - 1];
+        final w2 = h[i] + 2 * h[i - 1];
+        d[i] = (w1 + w2) / (w1 / delta[i - 1] + w2 / delta[i]);
+      }
+    }
+    d[0] = delta[0];
+    d[d.length - 1] = delta.last;
+    return d;
   }
 
   @override

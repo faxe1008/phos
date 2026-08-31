@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:phos_core/phos_core.dart';
 
+import '../preview/nikon_filter.dart';
 import '../state/app_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/compare_preview_box.dart';
@@ -68,6 +69,37 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
     _update((p) => p.copyWith(toneCurve: null));
   }
 
+  bool get _hasGrading =>
+      (_nikon.colorGrading?.values.any((z) => !z.isNeutral) ?? false) ||
+      (_nikon.gradingBlending ?? 50) != 50 ||
+      (_nikon.gradingBalance ?? 0) != 0;
+
+  void _setZone(String zone, {int? hue, int? chroma, int? brightness}) {
+    final zones = <String, GradingZone>{
+      for (final n in GradingZone.zoneNames)
+        n: _nikon.colorGrading?[n] ?? const GradingZone(),
+    };
+    final z = zones[zone]!;
+    zones[zone] = GradingZone(
+      hue: hue ?? z.hue,
+      chroma: chroma ?? z.chroma,
+      brightness: brightness ?? z.brightness,
+    );
+    _update((p) => p.copyWith(colorGrading: zones));
+  }
+
+  void _resetGrading() {
+    _update((p) => p.copyWith(
+          colorGrading: const {
+            'highlights': GradingZone(),
+            'midtones': GradingZone(),
+            'shadows': GradingZone(),
+          },
+          gradingBlending: 50,
+          gradingBalance: 0,
+        ));
+  }
+
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     final saved = widget.recipe
@@ -76,13 +108,10 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
     widget.model.saveEdited(saved);
     if (mounted) Navigator.of(context).pop(saved);
   }
-
-  @override
+@override
   Widget build(BuildContext context) {
-    final hasColor = (_nikon.colorBlender != null &&
-            _nikon.colorBlender!.values.any((c) => !c.isNeutral)) ||
-        (_nikon.colorGrading != null &&
-            _nikon.colorGrading!.values.any((z) => !z.isNeutral));
+    final hasBlender = _nikon.colorBlender != null &&
+        _nikon.colorBlender!.values.any((c) => !c.isNeutral);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit style'),
@@ -125,6 +154,8 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           ),
           const SizedBox(height: 14),
           _curveSection(),
+          const SizedBox(height: 14),
+          _gradingSection(),
           const SizedBox(height: 8),
           _slider(
             'Contrast',
@@ -191,25 +222,11 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
             (_nikon.clarity ?? NikonParams.defaultClarity).toStringAsFixed(2),
             (v) => _update((p) => p.copyWith(clarity: v)),
           ),
-          _slider(
-            'Split-tone balance',
-            _nikon.gradingBalance ?? 0,
-            -100, 100, 200,
-            (_nikon.gradingBalance ?? 0).toString(),
-            (v) => _update((p) => p.copyWith(gradingBalance: v.round())),
-          ),
-          _slider(
-            'Split-tone blending',
-            _nikon.gradingBlending ?? 50,
-            0, 100, 100,
-            (_nikon.gradingBlending ?? 50).toString(),
-            (v) => _update((p) => p.copyWith(gradingBlending: v.round())),
-          ),
-          if (hasColor) ...[
+          if (hasBlender) ...[
             const SizedBox(height: 14),
             _notice(
-              'Color channels and split-toning colors are carried over '
-              'from the original style (not editable yet).',
+              'Color channels (blender) are carried over from the '
+              'original style (not editable yet).',
             ),
           ],
         ],
@@ -260,6 +277,109 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _gradingSection() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.hairline),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Color grading',
+                    style:
+                        TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+              ),
+              if (_hasGrading)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  tooltip: 'Reset grading',
+                  onPressed: _resetGrading,
+                ),
+            ],
+          ),
+          for (final zone in GradingZone.zoneNames) _gradingRow(zone),
+          const SizedBox(height: 4),
+          _slider(
+            'Blending',
+            _nikon.gradingBlending ?? 50,
+            0, 100, 100,
+            (_nikon.gradingBlending ?? 50).toString(),
+            (v) => _update((p) => p.copyWith(gradingBlending: v.round())),
+          ),
+          _slider(
+            'Balance',
+            _nikon.gradingBalance ?? 0,
+            -100, 100, 200,
+            (_nikon.gradingBalance ?? 0).toString(),
+            (v) => _update((p) => p.copyWith(gradingBalance: v.round())),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _gradingRow(String zone) {
+    final z = _nikon.colorGrading?[zone] ?? const GradingZone();
+    final deg = z.hue * 360.0 / 4096;
+    final sat = (z.chroma.abs() / 100.0).clamp(0.0, 1.0);
+    final (tr, tg, tb) = hslToRgb(deg, sat, 0.5);
+    final label = zone[0].toUpperCase() + zone.substring(1);
+    return Column(
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color.fromARGB(
+                    255, (tr * 255).round(), (tg * 255).round(), (tb * 255).round()),
+                border: Border.all(color: AppTheme.hairline),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(label,
+                style:
+                    const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            const Spacer(),
+            Text(
+              z.isNeutral ? 'neutral' : '${z.chroma.abs()}% chroma',
+              style:
+                  const TextStyle(fontSize: 11, color: AppTheme.textTertiary),
+            ),
+          ],
+        ),
+        _slider(
+          'Hue',
+          deg.round().toDouble(),
+          0, 360, 360,
+          '${deg.round()}\u00B0',
+          (v) => _setZone(zone, hue: (v / 360 * 4096).round() % 4096),
+        ),
+        _slider(
+          'Chroma',
+          z.chroma.toDouble(),
+          -100, 100, 200,
+          z.chroma.toString(),
+          (v) => _setZone(zone, chroma: v.round()),
+        ),
+        _slider(
+          'Brightness',
+          z.brightness.toDouble(),
+          -100, 100, 200,
+          z.brightness.toString(),
+          (v) => _setZone(zone, brightness: v.round()),
+        ),
+      ],
     );
   }
 

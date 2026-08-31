@@ -13,7 +13,11 @@ import '../widgets/status_chips.dart';
 
 /// Full-screen view of one style: big preview, fidelity report, actions.
 class StyleDetailScreen extends StatefulWidget {
-  const StyleDetailScreen({super.key, required this.model, required this.recipe});
+  const StyleDetailScreen({
+    super.key,
+    required this.model,
+    required this.recipe,
+  });
 
   final AppModel model;
   final UniversalRecipe recipe;
@@ -32,45 +36,57 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
     );
   }
 
-  /// Editing works on a copy (originals are immutable): duplicate the style,
-  /// replace this screen with the editor, and — on save — jump to the
-  /// detail screen of the edited copy. An unsaved editor drops the copy.
+  /// User-created recipes are edited in place. Source artifacts remain
+  /// immutable, so built-ins and imports continue through the copy flow.
   Future<void> _edit() async {
     final m = widget.model;
+    final editInPlace = widget.recipe.sourceFormat == SourceFormat.user;
     final proceed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surfaceHigh,
-        title: const Text('Edit a copy?'),
-        content: const Text(
-          'Styles are versioned — the original is never modified. '
-          'Phos will create an editable copy of this style.',
+        title: Text(editInPlace ? 'Edit style?' : 'Edit a copy?'),
+        content: Text(
+          editInPlace
+              ? 'This style will be updated in your library.'
+              : 'Source styles are immutable. Phos will create an editable copy.',
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Create copy')),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(editInPlace ? 'Edit' : 'Create copy'),
+          ),
         ],
       ),
     );
     if (proceed != true || !mounted) return;
-    final copy = m.duplicateForEditing(widget.recipe);
+    final copy = editInPlace
+        ? widget.recipe
+        : m.duplicateForEditing(widget.recipe);
     if (!mounted) return;
-    final saved = await Navigator.of(context)
-        .pushReplacement<UniversalRecipe, void>(
-          MaterialPageRoute<UniversalRecipe>(
-              builder: (_) => StyleEditorScreen(model: m, recipe: copy)),
-        );
-    if (saved == null) {
+    final saved = editInPlace
+        ? await Navigator.of(context).push<UniversalRecipe>(
+            MaterialPageRoute<UniversalRecipe>(
+              builder: (_) => StyleEditorScreen(model: m, recipe: copy),
+            ),
+          )
+        : await Navigator.of(context).pushReplacement<UniversalRecipe, void>(
+            MaterialPageRoute<UniversalRecipe>(
+              builder: (_) => StyleEditorScreen(model: m, recipe: copy),
+            ),
+          );
+    if (saved == null && !editInPlace) {
       // Cancelled: drop the unused copy.
       m.remove(copy);
-    } else if (mounted) {
+    } else if (saved != null && mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-            builder: (_) => StyleDetailScreen(model: m, recipe: saved)),
+          builder: (_) => StyleDetailScreen(model: m, recipe: saved),
+        ),
       );
     }
   }
@@ -81,12 +97,20 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surfaceHigh,
         title: const Text('Delete this style?'),
-        content: Text('“${widget.recipe.name}” will be removed from your library.'),
+        content: Text(
+          '“${widget.recipe.name}” will be removed from your library.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: Color(0xFFFF6B57))),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Color(0xFFFF6B57)),
+            ),
           ),
         ],
       ),
@@ -129,8 +153,9 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
                 onPressed: _edit,
               ),
               IconButton(
-                tooltip:
-                    r.favorites ? 'Remove from favorites' : 'Add to favorites',
+                tooltip: r.favorites
+                    ? 'Remove from favorites'
+                    : 'Add to favorites',
                 icon: Icon(
                   r.favorites ? Icons.star : Icons.star_border,
                   color: r.favorites ? AppTheme.seed : null,
@@ -140,8 +165,10 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
               if (isImport && !m.isShipped(r))
                 IconButton(
                   tooltip: 'Delete',
-                  icon:
-                      const Icon(Icons.delete_outline, color: Color(0xFFFF6B57)),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: Color(0xFFFF6B57),
+                  ),
                   onPressed: _delete,
                 ),
             ],
@@ -165,7 +192,9 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
                   child: Text(
                     'Hold the preview to compare with the original',
                     style: TextStyle(
-                        fontSize: 11, color: AppTheme.textTertiary),
+                      fontSize: 11,
+                      color: AppTheme.textTertiary,
+                    ),
                   ),
                 ),
               ),
@@ -188,8 +217,11 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.open_in_new,
-                                  size: 12, color: AppTheme.textTertiary),
+                              const Icon(
+                                Icons.open_in_new,
+                                size: 12,
+                                color: AppTheme.textTertiary,
+                              ),
                               const SizedBox(width: 3),
                               Flexible(
                                 child: Text(
@@ -213,17 +245,24 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
                   (r.author?.isNotEmpty ?? false)) ...[
                 const SizedBox(height: 12),
                 if (r.description?.isNotEmpty ?? false)
-                  Text(r.description!,
-                      style: const TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                          height: 1.4)),
+                  Text(
+                    r.description!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
                 if (r.author?.isNotEmpty ?? false)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Text('by ${r.author}',
-                        style: const TextStyle(
-                            fontSize: 12, color: AppTheme.textTertiary)),
+                    child: Text(
+                      'by ${r.author}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textTertiary,
+                      ),
+                    ),
                   ),
               ],
               if (r.tags.isNotEmpty)
@@ -235,7 +274,9 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
                     children: [
                       for (final t in r.tags)
                         Chip(
-                            label: Text(t), visualDensity: VisualDensity.compact),
+                          label: Text(t),
+                          visualDensity: VisualDensity.compact,
+                        ),
                     ],
                   ),
                 ),
@@ -272,14 +313,20 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
                     children: const [
                       Row(
                         children: [
-                          Icon(Icons.cameraswitch_outlined,
-                              size: 16, color: AppTheme.seed),
+                          Icon(
+                            Icons.cameraswitch_outlined,
+                            size: 16,
+                            color: AppTheme.seed,
+                          ),
                           SizedBox(width: 8),
-                          Text('Using it on the Z50II',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.6)),
+                          Text(
+                            'Using it on the Z50II',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
                         ],
                       ),
                       SizedBox(height: 10),
@@ -289,9 +336,10 @@ class _StyleDetailScreenState extends State<StyleDetailScreen> {
                         '3. On the camera: Menu → Setup → Custom LUT → pick the file.\n'
                         '4. Select it from the Custom LUT list in your shooting menu.',
                         style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.textTertiary,
-                            height: 1.5),
+                          fontSize: 12,
+                          color: AppTheme.textTertiary,
+                          height: 1.5,
+                        ),
                       ),
                     ],
                   ),
