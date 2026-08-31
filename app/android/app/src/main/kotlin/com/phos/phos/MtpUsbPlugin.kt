@@ -15,14 +15,12 @@ import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.util.Log
-import androidx.activity.ComponentActivity
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.PluginRegistry
 
 /**
  * Host-side USB transport for the Nikon PTP/MTP protocol.
@@ -35,7 +33,8 @@ import io.flutter.plugin.common.MethodChannel
  * Expected to be verified against a real Z50II over USB-OTG; the wire
  * protocol itself is covered by unit tests in the core package.
  */
-class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandler {
+class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandler,
+    PluginRegistry.RequestPermissionsResultListener {
 
     companion object {
         const val CHANNEL = "phos.mtp_usb"
@@ -53,10 +52,12 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
         private const val EP_DIR_IN = 0x80
         private const val ACTION_USB_PERMISSION =
             "android.hardware.usb.action.USB_PERMISSION"
+        private const val CAMERA_PERMISSION_REQUEST = 1401
     }
 
     private var binding: FlutterPlugin.FlutterPluginBinding? = null
     private var activity: Activity? = null
+    private var activityBinding: ActivityPluginBinding? = null
     private var receiverActivity: Activity? = null
     private var channel: MethodChannel? = null
     private var usb: UsbManager? = null
@@ -68,8 +69,6 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
     private var epOut: UsbEndpoint? = null
 
     private var permissionResult: MethodChannel.Result? = null
-    private var cameraLauncher: ActivityResultLauncher<String>? = null
-
     /// The USB permission request to resume once the CAMERA permission
     /// (prerequisite for USB devices with video capture) has been decided.
     private var pendingUsb: Pair<String, MethodChannel.Result>? = null
@@ -125,8 +124,9 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
     override fun onAttachedToActivity(activityBinding: ActivityPluginBinding) {
         try {
             activity = activityBinding.activity
+            this.activityBinding = activityBinding
+            activityBinding.addRequestPermissionsResultListener(this)
             registerReceiverIfNeeded()
-            registerCameraLauncher()
         } catch (e: Exception) {
             Log.e(TAG, "onAttachedToActivity failed", e)
         }
@@ -135,8 +135,9 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
     override fun onReattachedToActivityForConfigChanges(activityBinding: ActivityPluginBinding) {
         try {
             activity = activityBinding.activity
+            this.activityBinding = activityBinding
+            activityBinding.addRequestPermissionsResultListener(this)
             registerReceiverIfNeeded()
-            registerCameraLauncher()
         } catch (e: Exception) {
             Log.e(TAG, "onReattachedToActivity failed", e)
         }
@@ -144,36 +145,34 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
 
     override fun onDetachedFromActivityForConfigChanges() {
         unregisterReceiver()
-        cameraLauncher = null
+        activityBinding?.removeRequestPermissionsResultListener(this)
+        activityBinding = null
     }
 
     override fun onDetachedFromActivity() {
         unregisterReceiver()
-        cameraLauncher = null
+        activityBinding?.removeRequestPermissionsResultListener(this)
+        activityBinding = null
         activity = null
     }
 
-    private fun registerCameraLauncher() {
-        // ActivityPluginBinding exposes the framework Activity; the result
-        // API needs the androidx ComponentActivity (FlutterActivity is one).
-        val a = activity as? ComponentActivity
-            ?: run {
-                Log.w(TAG, "activity is not a ComponentActivity")
-                return
-            }
-        if (cameraLauncher != null) return
-        cameraLauncher = a.registerForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) { granted ->
-            val pending = pendingUsb ?: return@registerForActivityResult
-            pendingUsb = null
-            if (granted) {
-                // CAMERA granted: now ask for USB access as usual.
-                requestUsbPermission(pending.first, pending.second)
-            } else {
-                pending.second.success(false)
-            }
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ): Boolean {
+        if (requestCode != CAMERA_PERMISSION_REQUEST) return false
+        val pending = pendingUsb ?: return true
+        pendingUsb = null
+        val granted = permissions.contains(Manifest.permission.CAMERA) &&
+            grantResults.getOrNull(permissions.indexOf(Manifest.permission.CAMERA)) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            requestUsbPermission(pending.first, pending.second)
+        } else {
+            pending.second.success(false)
         }
+        return true
     }
 
     private fun registerReceiverIfNeeded() {
@@ -277,11 +276,10 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
         if (ctx.checkSelfPermission(Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED
         ) {
-            val launcher = cameraLauncher
+            val a = activity
                 ?: throw IllegalStateException("no activity to request permissions")
             pendingUsb = name to result
-            launcher.launch(Manifest.permission.CAMERA)
-            // The result is delivered by the launcher callback.
+            a.requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_REQUEST)
             return
         }
         requestUsbPermission(name, result)
