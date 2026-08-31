@@ -67,6 +67,9 @@ class _ColorWheelPainter extends CustomPainter {
 
     final ring = Paint()
       ..shader = const SweepGradient(
+        // The picker maps hue zero/red to the top, then rotates clockwise.
+        startAngle: -math.pi / 2,
+        endAngle: 3 * math.pi / 2,
         colors: [
           Color(0xFFFF3B30),
           Color(0xFFFFCC00),
