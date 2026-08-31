@@ -37,9 +37,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    // The 4:3 preview fills the test surface; scroll down so the lazy
-    // ListView builds the sliders.
-    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    // The 4:3 preview + curve section fill the test surface; scroll down so
+    // the lazy ListView builds the sliders.
+    await tester.drag(find.byType(ListView), const Offset(0, -700));
     await tester.pumpAndSettle();
 
     // The first slider is Contrast.

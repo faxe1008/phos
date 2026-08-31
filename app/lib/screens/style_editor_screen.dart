@@ -5,6 +5,7 @@ import 'package:phos_core/phos_core.dart';
 import '../state/app_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/compare_preview_box.dart';
+import '../widgets/tone_curve_editor.dart';
 
 /// Edit the Nikon projection of a style (always a user copy — the original
 /// is immutable) with a live preview.
@@ -45,8 +46,26 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
 
   void _reset() {
     // Neutral sliders, but keep the tone curve: it is the style's
-    // character and has no editor yet.
+    // character. The curve can be removed from its own section.
     _update((p) => NikonParams(toneCurve: p.toneCurve));
+  }
+
+  List<Point> get _curvePoints {
+    final c = _nikon.toneCurve;
+    if (c == null) return const [];
+    return c.points
+        .where((p) => p.x > 0 && p.x < 255)
+        .toList()
+      ..sort((a, b) => a.x.compareTo(b.x));
+  }
+
+  void _setCurve(List<Point> pts) {
+    _update(
+        (p) => p.copyWith(toneCurve: CurveBuilder.fromControlPoints(pts)));
+  }
+
+  void _removeCurve() {
+    _update((p) => p.copyWith(toneCurve: null));
   }
 
   Future<void> _save() async {
@@ -60,7 +79,6 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasCurve = _nikon.hasToneCurve;
     final hasColor = (_nikon.colorBlender != null &&
             _nikon.colorBlender!.values.any((c) => !c.isNeutral)) ||
         (_nikon.colorGrading != null &&
@@ -105,14 +123,8 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
               labelStyle: const TextStyle(color: AppTheme.textTertiary),
             ),
           ),
-          if (hasCurve) ...[
-            const SizedBox(height: 14),
-            _notice(
-              'This style uses a custom tone curve. On the camera it '
-              'overrides the tonal sliders below; the curve itself is '
-              'not editable yet.',
-            ),
-          ],
+          const SizedBox(height: 14),
+          _curveSection(),
           const SizedBox(height: 8),
           _slider(
             'Contrast',
@@ -200,6 +212,52 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
               'from the original style (not editable yet).',
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _curveSection() {
+    final hasCurve = _nikon.hasToneCurve;
+    final size = 200.0;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.hairline),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Tone curve',
+                    style:
+                        TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+              ),
+              Text(
+                hasCurve
+                    ? 'on the camera this overrides the sliders below'
+                    : 'tap to add a point',
+                style: const TextStyle(
+                    fontSize: 11, color: AppTheme.textTertiary),
+              ),
+              if (hasCurve)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  tooltip: 'Remove curve',
+                  onPressed: _removeCurve,
+                ),
+            ],
+          ),
+          Center(
+            child: ToneCurveEditor(
+              points: _curvePoints,
+              onChanged: _setCurve,
+              size: size,
+            ),
+          ),
         ],
       ),
     );
