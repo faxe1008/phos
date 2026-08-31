@@ -103,21 +103,23 @@ void main() {
     await tester.pumpAndSettle();
 
     // 'Midtones' is unique (only the grading section uses it); the
-    // highlights Hue slider sits just above it.
+    // highlights wheel sits just above it.
     await tester.scrollUntilVisible(
       find.text('Midtones'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.drag(sliderForLabel('Hue'), const Offset(80, 0));
+    final wheel = find.byKey(const ValueKey('color-wheel-highlights'));
+    final wheelCenter = tester.getCenter(wheel);
+    await tester.tapAt(wheelCenter + const Offset(28, -28));
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.text('Blending'),
-      100,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.drag(sliderForLabel('Blending'), const Offset(60, 0));
+    final blendingSlider = sliderForLabel('Blending');
+    await tester.drag(find.byType(ListView).first, const Offset(0, -700));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(blendingSlider);
+    await tester.pumpAndSettle();
+    await tester.drag(blendingSlider, const Offset(60, 0));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Save'));

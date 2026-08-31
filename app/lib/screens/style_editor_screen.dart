@@ -6,6 +6,7 @@ import '../preview/nikon_filter.dart';
 import '../state/app_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/compare_preview_box.dart';
+import '../widgets/color_wheel.dart';
 import '../widgets/tone_curve_editor.dart';
 
 /// Edit the Nikon projection of a style (always a user copy — the original
@@ -54,15 +55,12 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
   List<Point> get _curvePoints {
     final c = _nikon.toneCurve;
     if (c == null) return const [];
-    return c.points
-        .where((p) => p.x > 0 && p.x < 255)
-        .toList()
+    return c.points.where((p) => p.x > 0 && p.x < 255).toList()
       ..sort((a, b) => a.x.compareTo(b.x));
   }
 
   void _setCurve(List<Point> pts) {
-    _update(
-        (p) => p.copyWith(toneCurve: CurveBuilder.fromControlPoints(pts)));
+    _update((p) => p.copyWith(toneCurve: CurveBuilder.fromControlPoints(pts)));
   }
 
   void _removeCurve() {
@@ -89,15 +87,17 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
   }
 
   void _resetGrading() {
-    _update((p) => p.copyWith(
-          colorGrading: const {
-            'highlights': GradingZone(),
-            'midtones': GradingZone(),
-            'shadows': GradingZone(),
-          },
-          gradingBlending: 50,
-          gradingBalance: 0,
-        ));
+    _update(
+      (p) => p.copyWith(
+        colorGrading: const {
+          'highlights': GradingZone(),
+          'midtones': GradingZone(),
+          'shadows': GradingZone(),
+        },
+        gradingBlending: 50,
+        gradingBalance: 0,
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -108,9 +108,11 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
     widget.model.saveEdited(saved);
     if (mounted) Navigator.of(context).pop(saved);
   }
-@override
+
+  @override
   Widget build(BuildContext context) {
-    final hasBlender = _nikon.colorBlender != null &&
+    final hasBlender =
+        _nikon.colorBlender != null &&
         _nikon.colorBlender!.values.any((c) => !c.isNeutral);
     return Scaffold(
       appBar: AppBar(
@@ -145,8 +147,7 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           const SizedBox(height: 16),
           TextField(
             controller: _nameCtrl,
-            style:
-                const TextStyle(fontSize: 15, color: AppTheme.textPrimary),
+            style: const TextStyle(fontSize: 15, color: AppTheme.textPrimary),
             decoration: InputDecoration(
               labelText: 'Name',
               labelStyle: const TextStyle(color: AppTheme.textTertiary),
@@ -160,49 +161,63 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           _slider(
             'Contrast',
             _nikon.contrast ?? 0,
-            -100, 100, 200,
+            -100,
+            100,
+            200,
             (_nikon.contrast ?? 0).toString(),
             (v) => _update((p) => p.copyWith(contrast: v.round())),
           ),
           _slider(
             'Highlights',
             _nikon.highlights ?? 0,
-            -100, 100, 200,
+            -100,
+            100,
+            200,
             (_nikon.highlights ?? 0).toString(),
             (v) => _update((p) => p.copyWith(highlights: v.round())),
           ),
           _slider(
             'Shadows',
             _nikon.shadows ?? 0,
-            -100, 100, 200,
+            -100,
+            100,
+            200,
             (_nikon.shadows ?? 0).toString(),
             (v) => _update((p) => p.copyWith(shadows: v.round())),
           ),
           _slider(
             'White level',
             _nikon.whiteLevel ?? 0,
-            -100, 100, 200,
+            -100,
+            100,
+            200,
             (_nikon.whiteLevel ?? 0).toString(),
             (v) => _update((p) => p.copyWith(whiteLevel: v.round())),
           ),
           _slider(
             'Black level',
             _nikon.blackLevel ?? 0,
-            -100, 100, 200,
+            -100,
+            100,
+            200,
             (_nikon.blackLevel ?? 0).toString(),
             (v) => _update((p) => p.copyWith(blackLevel: v.round())),
           ),
           _slider(
             'Saturation',
             _nikon.saturation ?? 0,
-            -100, 100, 200,
+            -100,
+            100,
+            200,
             (_nikon.saturation ?? 0).toString(),
             (v) => _update((p) => p.copyWith(saturation: v.round())),
           ),
           _slider(
             'Sharpening',
             _nikon.sharpening ?? NikonParams.defaultSharpening,
-            -3, 9, 48,
+            -3,
+            9,
+            48,
             (_nikon.sharpening ?? NikonParams.defaultSharpening)
                 .toStringAsFixed(2),
             (v) => _update((p) => p.copyWith(sharpening: v)),
@@ -210,7 +225,9 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           _slider(
             'Mid-range sharpening',
             _nikon.midRangeSharpening ?? NikonParams.defaultMidRangeSharpening,
-            -5, 5, 40,
+            -5,
+            5,
+            40,
             (_nikon.midRangeSharpening ?? NikonParams.defaultMidRangeSharpening)
                 .toStringAsFixed(2),
             (v) => _update((p) => p.copyWith(midRangeSharpening: v)),
@@ -218,7 +235,9 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           _slider(
             'Clarity',
             _nikon.clarity ?? NikonParams.defaultClarity,
-            -5, 5, 40,
+            -5,
+            5,
+            40,
             (_nikon.clarity ?? NikonParams.defaultClarity).toStringAsFixed(2),
             (v) => _update((p) => p.copyWith(clarity: v)),
           ),
@@ -249,16 +268,19 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           Row(
             children: [
               const Expanded(
-                child: Text('Tone curve',
-                    style:
-                        TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+                child: Text(
+                  'Tone curve',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                ),
               ),
               Text(
                 hasCurve
                     ? 'on the camera this overrides the sliders below'
                     : 'tap to add a point',
                 style: const TextStyle(
-                    fontSize: 11, color: AppTheme.textTertiary),
+                  fontSize: 11,
+                  color: AppTheme.textTertiary,
+                ),
               ),
               if (hasCurve)
                 IconButton(
@@ -293,9 +315,10 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           Row(
             children: [
               const Expanded(
-                child: Text('Color grading',
-                    style:
-                        TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+                child: Text(
+                  'Color grading',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                ),
               ),
               if (_hasGrading)
                 IconButton(
@@ -310,14 +333,18 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           _slider(
             'Blending',
             _nikon.gradingBlending ?? 50,
-            0, 100, 100,
+            0,
+            100,
+            100,
             (_nikon.gradingBlending ?? 50).toString(),
             (v) => _update((p) => p.copyWith(gradingBlending: v.round())),
           ),
           _slider(
             'Balance',
             _nikon.gradingBalance ?? 0,
-            -100, 100, 200,
+            -100,
+            100,
+            200,
             (_nikon.gradingBalance ?? 0).toString(),
             (v) => _update((p) => p.copyWith(gradingBalance: v.round())),
           ),
@@ -342,40 +369,66 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Color.fromARGB(
-                    255, (tr * 255).round(), (tg * 255).round(), (tb * 255).round()),
+                  255,
+                  (tr * 255).round(),
+                  (tg * 255).round(),
+                  (tb * 255).round(),
+                ),
                 border: Border.all(color: AppTheme.hairline),
               ),
             ),
             const SizedBox(width: 8),
-            Text(label,
-                style:
-                    const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
+            ),
             const Spacer(),
             Text(
               z.isNeutral ? 'neutral' : '${z.chroma.abs()}% chroma',
-              style:
-                  const TextStyle(fontSize: 11, color: AppTheme.textTertiary),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppTheme.textTertiary,
+              ),
             ),
           ],
         ),
-        _slider(
-          'Hue',
-          deg.round().toDouble(),
-          0, 360, 360,
-          '${deg.round()}\u00B0',
-          (v) => _setZone(zone, hue: (v / 360 * 4096).round() % 4096),
+        Center(
+          child: ColorWheel(
+            key: ValueKey('color-wheel-$zone'),
+            hue: deg,
+            chroma: z.chroma.abs().toDouble(),
+            onChanged: (value) => _setZone(
+              zone,
+              hue: (value.hue / 360 * 4096).round() % 4096,
+              chroma: value.chroma.round(),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            '${deg.round()}\u00B0 hue  ·  ${z.chroma.abs()}% chroma',
+            style: const TextStyle(fontSize: 11, color: AppTheme.textTertiary),
+          ),
         ),
         _slider(
           'Chroma',
           z.chroma.toDouble(),
-          -100, 100, 200,
+          -100,
+          100,
+          200,
           z.chroma.toString(),
           (v) => _setZone(zone, chroma: v.round()),
         ),
         _slider(
           'Brightness',
           z.brightness.toDouble(),
-          -100, 100, 200,
+          -100,
+          100,
+          200,
           z.brightness.toString(),
           (v) => _setZone(zone, brightness: v.round()),
         ),
@@ -392,9 +445,14 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.hairline),
       ),
-      child: Text(text,
-          style: const TextStyle(
-              fontSize: 12, color: AppTheme.textTertiary, height: 1.5)),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          color: AppTheme.textTertiary,
+          height: 1.5,
+        ),
+      ),
     );
   }
 
@@ -414,17 +472,22 @@ class _StyleEditorScreenState extends State<StyleEditorScreen> {
           Row(
             children: [
               Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        fontSize: 13, color: AppTheme.textPrimary)),
-              ),
-              Text(valueText,
+                child: Text(
+                  label,
                   style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                      fontFeatures: [
-                        FontFeature.tabularFigures()
-                      ])),
+                    fontSize: 13,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              Text(
+                valueText,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
             ],
           ),
           Slider(
