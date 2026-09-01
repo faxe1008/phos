@@ -39,8 +39,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final msg = await widget.model.setPreviewImage();
     if (!mounted) return;
     if (msg != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
@@ -48,9 +47,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return list;
     return list
-        .where((s) =>
-            s.name.toLowerCase().contains(q) ||
-            s.tags.any((t) => t.toLowerCase().contains(q)))
+        .where(
+          (s) =>
+              s.name.toLowerCase().contains(q) ||
+              s.tags.any((t) => t.toLowerCase().contains(q)),
+        )
         .toList();
   }
 
@@ -109,7 +110,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 final builtins = _filter(m.builtins);
                 final disc = _filter(m.discoveries);
                 final imports = _filter(m.imports);
-                final nothing = builtins.isEmpty &&
+                final nothing =
+                    builtins.isEmpty &&
                     disc.isEmpty &&
                     imports.isEmpty &&
                     favs.isEmpty;
@@ -119,8 +121,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     SliverToBoxAdapter(child: _searchBox()),
                     if (favs.isNotEmpty) ..._section('Favorites', favs),
                     if (builtins.isNotEmpty) ..._section('Catalog', builtins),
-                    if (disc.isNotEmpty)
-                      ..._section('From film.recipes', disc),
+                    if (disc.isNotEmpty) ..._section('From film.recipes', disc),
                     if (imports.isNotEmpty) ..._section('My imports', imports),
                     if (nothing) SliverToBoxAdapter(child: _noResults()),
                   ],
@@ -165,12 +166,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
               child: TextField(
                 controller: _search,
                 style: const TextStyle(
-                    fontSize: 13, color: AppTheme.textPrimary),
+                  fontSize: 13,
+                  color: AppTheme.textPrimary,
+                ),
                 decoration: const InputDecoration(
                   isDense: true,
                   border: InputBorder.none,
                   hintText: 'Search styles…',
-                  hintStyle: TextStyle(color: AppTheme.textTertiary, fontSize: 13),
+                  hintStyle: TextStyle(
+                    color: AppTheme.textTertiary,
+                    fontSize: 13,
+                  ),
                 ),
                 onChanged: (v) => setState(() => _query = v),
               ),
@@ -205,14 +211,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
               color: const Color(0xFF3A1D1D),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: const Color(0xFFE8590C).withValues(alpha: 0.4)),
+                color: const Color(0xFFE8590C).withValues(alpha: 0.4),
+              ),
             ),
             child: Row(
               children: [
                 Expanded(
-                    child: Text(m.error!,
-                        style: const TextStyle(
-                            fontSize: 12, color: Color(0xFFFFB4A2)))),
+                  child: Text(
+                    m.error!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFFFB4A2),
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.close, size: 16),
@@ -235,18 +247,26 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.photo_library_outlined,
-                      size: 18, color: AppTheme.seed),
+                  Icon(
+                    Icons.photo_library_outlined,
+                    size: 18,
+                    color: AppTheme.seed,
+                  ),
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Previewing on a default test card — tap to use your own photo',
                       style: TextStyle(
-                          fontSize: 12, color: AppTheme.textSecondary),
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ),
-                  Icon(Icons.chevron_right,
-                      size: 18, color: AppTheme.textTertiary),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: AppTheme.textTertiary,
+                  ),
                 ],
               ),
             ),
@@ -259,12 +279,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
     SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 18, 16, 10),
-        child: Text(title,
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-                color: AppTheme.textTertiary)),
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+            color: AppTheme.textTertiary,
+          ),
+        ),
       ),
     ),
     SliverPadding(
@@ -276,23 +299,25 @@ class _LibraryScreenState extends State<LibraryScreen> {
           crossAxisSpacing: 12,
           childAspectRatio: 0.68,
         ),
-        delegate: SliverChildBuilderDelegate(
-          (context, i) {
-            final r = styles[i];
-            return StyleCard(
-              recipe: r,
-              service: widget.model.preview,
-              baseJpeg: widget.model.baseJpeg,
-              version: widget.model.previewVersion,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => StyleDetailScreen(
-                        model: widget.model, recipe: r)),
+        delegate: SliverChildBuilderDelegate((context, i) {
+          final r = styles[i];
+          return StyleCard(
+            recipe: r,
+            service: widget.model.preview,
+            baseJpeg: widget.model.baseJpeg,
+            version: widget.model.previewVersion,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StyleDetailScreen(
+                  model: widget.model,
+                  recipe: r,
+                  styles: styles,
+                  initialIndex: i,
+                ),
               ),
-            );
-          },
-          childCount: styles.length,
-        ),
+            ),
+          );
+        }, childCount: styles.length),
       ),
     ),
   ];
@@ -315,7 +340,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
               _query.isEmpty
                   ? 'Nothing here yet — import your first style.'
                   : 'No styles match “$_query”.',
-              style: const TextStyle(fontSize: 12, color: AppTheme.textTertiary),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textTertiary,
+              ),
             ),
           ),
         ],
