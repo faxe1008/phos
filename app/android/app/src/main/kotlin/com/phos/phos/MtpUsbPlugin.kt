@@ -179,15 +179,15 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
         val a = activity ?: return
         if (receiverActivity === a) return
         unregisterReceiver()
-        // USB_PERMISSION is not a protected broadcast, so on Android 14+
-        // (targeting API 34+) the exported flag is mandatory or the
-        // framework throws SecurityException. The system always may
-        // deliver to a NOT_EXPORTED receiver, so that is the safe choice.
+        // The USB permission result is delivered by the system USB service.
+        // RECEIVER_EXPORTED is required for that system callback on Android
+        // 14+; NOT_EXPORTED can leave the pending MethodChannel call waiting
+        // until Dart times out even when the user approved USB access.
         if (Build.VERSION.SDK_INT >= 34) {
             a.registerReceiver(
                 receiver,
                 IntentFilter(ACTION_USB_PERMISSION),
-                Context.RECEIVER_NOT_EXPORTED
+                Context.RECEIVER_EXPORTED
             )
         } else {
             a.registerReceiver(receiver, IntentFilter(ACTION_USB_PERMISSION))
