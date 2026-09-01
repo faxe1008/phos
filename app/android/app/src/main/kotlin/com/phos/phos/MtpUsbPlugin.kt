@@ -21,6 +21,7 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
+import java.util.concurrent.Executors
 
 /**
  * Host-side USB transport for the Nikon PTP/MTP protocol.
@@ -67,6 +68,7 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
     private var mtpInterface: UsbInterface? = null
     private var epIn: UsbEndpoint? = null
     private var epOut: UsbEndpoint? = null
+    private val ioExecutor = Executors.newSingleThreadExecutor()
 
     private var permissionResult: MethodChannel.Result? = null
     /// The USB permission request to resume once the CAMERA permission
@@ -117,6 +119,7 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
         channel?.setMethodCallHandler(null)
         channel = null
         usb = null
+        ioExecutor.shutdownNow()
     }
 
     // ----------------------------------------------------------- ActivityAware --
@@ -366,42 +369,55 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
     }
 
     private fun writeBytes(data: ByteArray, result: MethodChannel.Result) {
-        val conn = connection ?: throw IllegalStateException("device not open")
-        val ep = epOut ?: throw IllegalStateException("no bulk OUT endpoint")
-        var offset = 0
-        while (offset < data.size) {
-            val chunk = data.copyOfRange(offset, data.size)
-            val n = conn.bulkTransfer(ep, chunk, chunk.size, TIMEOUT_MS)
-            if (n <= 0) {
-                throw IllegalStateException(
-                    if (n == -1) "bulk OUT timed out (camera gone or stalled?)"
-                    else "bulk OUT made no progress"
-                )
+        ioExecutor.execute {
+            try {
+                val conn = connection ?: throw IllegalStateException("device not open")
+                val ep = epOut ?: throw IllegalStateException("no bulk OUT endpoint")
+                var offset = 0
+                while (offset < data.size) {
+                    val n = conn.bulkTransfer(ep, data, offset, data.size - offset, TIMEOUT_MS)
+                    if (n <= 0) {
+                        throw IllegalStateException(
+                            if (n == -1) "bulk OUT timed out (camera gone or stalled?)"
+                            else "bulk OUT made no progress"
+                        )
+                    }
+                    offset += n
+                }
+                result.success(null)
+            } catch (e: Exception) {
+                Log.w(TAG, "bulk OUT failed", e)
+                result.error("MtpError", e.message ?: e.javaClass.simpleName, null)
             }
-            offset += n
         }
-        result.success(null)
     }
 
     private fun readBytes(count: Int, result: MethodChannel.Result) {
         if (count <= 0 || count > (1 shl 20)) {
             throw IllegalArgumentException("count out of range: $count")
         }
-        val conn = connection ?: throw IllegalStateException("device not open")
-        val ep = epIn ?: throw IllegalStateException("no bulk IN endpoint")
-        val buf = ByteArray(count)
-        var offset = 0
-        while (offset < count) {
-            val n = conn.bulkTransfer(ep, buf, offset, count - offset, TIMEOUT_MS)
-            if (n <= 0) {
-                throw IllegalStateException(
-                    if (n == -1) "bulk IN timed out (camera gone or stalled?)"
-                    else "bulk IN made no progress"
-                )
+        ioExecutor.execute {
+            try {
+                val conn = connection ?: throw IllegalStateException("device not open")
+                val ep = epIn ?: throw IllegalStateException("no bulk IN endpoint")
+                val buf = ByteArray(count)
+                var offset = 0
+                while (offset < count) {
+                    val n = conn.bulkTransfer(ep, buf, offset, count - offset, TIMEOUT_MS)
+                    if (n <= 0) {
+                        throw IllegalStateException(
+                            if (n == -1) "bulk IN timed out (camera gone or stalled?)"
+                            else "bulk IN made no progress"
+                        )
+                    }
+                    offset += n
+                }
+                result.success(buf.toList())
+            } catch (e: Exception) {
+                Log.w(TAG, "bulk IN failed", e)
+                result.error("MtpError", e.message ?: e.javaClass.simpleName, null)
             }
-            offset += n
         }
-        result.success(buf.toList())
     }
 
     private fun recover(result: MethodChannel.Result) {

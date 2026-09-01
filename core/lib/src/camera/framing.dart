@@ -73,27 +73,29 @@ class PtpContainer {
       'tx=$transactionId, ${payload.length}B payload)';
 }
 
-/// A command block: operation code + up to three u32 parameters.
+/// A command block: operation code + zero to three u32 parameters.
 class PtpCommand {
   const PtpCommand({
     required this.operation,
     required this.transactionId,
-    this.param1 = 0,
-    this.param2 = 0,
-    this.param3 = 0,
+    this.param1,
+    this.param2,
+    this.param3,
   });
 
   final int operation;
   final int transactionId;
-  final int param1;
-  final int param2;
-  final int param3;
+  final int? param1;
+  final int? param2;
+  final int? param3;
 
   PtpContainer toContainer() {
-    final p = Uint8List(12);
-    _le32(p, 0, param1);
-    _le32(p, 4, param2);
-    _le32(p, 8, param3);
+    final params = [param1, param2, param3];
+    final count = params.lastIndexWhere((value) => value != null) + 1;
+    final p = Uint8List(count * 4);
+    for (var i = 0; i < count; i++) {
+      _le32(p, i * 4, params[i]!);
+    }
     return PtpContainer(
       type: PtpContainer.typeCommand,
       code: operation,

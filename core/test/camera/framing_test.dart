@@ -12,11 +12,10 @@ void main() {
       expect(
         b,
         [
-          0x18, 0x00, 0x00, 0x00, // len 24
+          0x0c, 0x00, 0x00, 0x00, // len 12
           0x01, 0x00, // command
           0x01, 0x10, // 0x1001
           0x01, 0x00, 0x00, 0x00, // tx 1
-          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // params
         ],
       );
     });
@@ -38,6 +37,16 @@ void main() {
       expect(b.sublist(12, 16), [0xC9, 0x00, 0x00, 0x00]); // 201
       expect(b.sublist(16, 20), [0, 0, 0, 0]);
       expect(b.sublist(20, 24), [0, 0, 0, 0]);
+    });
+
+    test('omits parameters that were not supplied', () {
+      final b = PtpCommand(
+        operation: PtpOps.openSession,
+        transactionId: 0,
+        param1: 1,
+      ).toContainer().toBytes();
+      expect(b.length, 16);
+      expect(b.sublist(12), [1, 0, 0, 0]);
     });
   });
 

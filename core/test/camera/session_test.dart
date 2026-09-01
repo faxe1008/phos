@@ -33,8 +33,14 @@ class FakeTransport implements UsbTransport {
 PtpContainer resp(int tx, {int code = 0x5000, int p1 = 0, int p2 = 0}) {
   // Response payload is exactly [Param1 u32 LE][Param2 u32 LE].
   final p = <int>[
-    p1 & 0xff, (p1 >> 8) & 0xff, (p1 >> 16) & 0xff, (p1 >> 24) & 0xff,
-    p2 & 0xff, (p2 >> 8) & 0xff, (p2 >> 16) & 0xff, (p2 >> 24) & 0xff,
+    p1 & 0xff,
+    (p1 >> 8) & 0xff,
+    (p1 >> 16) & 0xff,
+    (p1 >> 24) & 0xff,
+    p2 & 0xff,
+    (p2 >> 8) & 0xff,
+    (p2 >> 16) & 0xff,
+    (p2 >> 24) & 0xff,
   ];
   return PtpContainer(
     type: PtpContainer.typeResponse,
@@ -59,9 +65,24 @@ void add16(List<int> b, int v) {
 PtpCommand cmd(PtpContainer c) => PtpCommand(
       operation: c.code,
       transactionId: c.transactionId,
-      param1: c.payload[0] | (c.payload[1] << 8) | (c.payload[2] << 16) | (c.payload[3] << 24),
-      param2: c.payload[4] | (c.payload[5] << 8) | (c.payload[6] << 16) | (c.payload[7] << 24),
-      param3: c.payload[8] | (c.payload[9] << 8) | (c.payload[10] << 16) | (c.payload[11] << 24),
+      param1: c.payload.length >= 4
+          ? c.payload[0] |
+              (c.payload[1] << 8) |
+              (c.payload[2] << 16) |
+              (c.payload[3] << 24)
+          : null,
+      param2: c.payload.length >= 8
+          ? c.payload[4] |
+              (c.payload[5] << 8) |
+              (c.payload[6] << 16) |
+              (c.payload[7] << 24)
+          : null,
+      param3: c.payload.length >= 12
+          ? c.payload[8] |
+              (c.payload[9] << 8) |
+              (c.payload[10] << 16) |
+              (c.payload[11] << 24)
+          : null,
     );
 
 void main() {
