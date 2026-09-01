@@ -54,6 +54,15 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
         private const val ACTION_USB_PERMISSION =
             "android.hardware.usb.action.USB_PERMISSION"
         private const val CAMERA_PERMISSION_REQUEST = 1401
+
+        // Standard USB control request to un-stall a bulk endpoint. A prior
+        // failed/aborted transaction (e.g. against a malformed command) can
+        // leave the camera's endpoint halted; that state survives closing
+        // and reopening the UsbDeviceConnection, so it must be cleared
+        // explicitly or every subsequent transfer times out.
+        private const val USB_RECIP_ENDPOINT_OUT = 0x02
+        private const val USB_REQ_CLEAR_FEATURE = 0x01
+        private const val USB_FEATURE_ENDPOINT_HALT = 0x00
     }
 
     private var binding: FlutterPlugin.FlutterPluginBinding? = null
@@ -365,7 +374,29 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
         mtpInterface = iface
         epIn = inEp
         epOut = outEp
+        // A stale halt from a previous session (e.g. a malformed command
+        // sent before this fix) would otherwise make every transfer time
+        // out even though the connection just opened cleanly.
+        clearHaltQuietly(conn, inEp)
+        clearHaltQuietly(conn, outEp)
         result.success(null)
+    }
+
+    /** Best-effort CLEAR_FEATURE(ENDPOINT_HALT); harmless if not halted. */
+    private fun clearHaltQuietly(conn: UsbDeviceConnection, ep: UsbEndpoint) {
+        try {
+            conn.controlTransfer(
+                USB_RECIP_ENDPOINT_OUT,
+                USB_REQ_CLEAR_FEATURE,
+                USB_FEATURE_ENDPOINT_HALT,
+                ep.address,
+                null,
+                0,
+                TIMEOUT_MS
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "clearHalt failed for endpoint ${ep.address}", e)
+        }
     }
 
     private fun writeBytes(data: ByteArray, result: MethodChannel.Result) {
@@ -429,6 +460,8 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
                 closeQuietly()
                 throw IllegalStateException("re-claim failed after recovery")
             }
+            epIn?.let { clearHaltQuietly(conn, it) }
+            epOut?.let { clearHaltQuietly(conn, it) }
         }
         result.success(null)
     }
