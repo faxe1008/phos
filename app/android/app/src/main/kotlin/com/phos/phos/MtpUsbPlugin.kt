@@ -180,7 +180,15 @@ class MtpUsbPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandl
             grantResults.getOrNull(permissions.indexOf(Manifest.permission.CAMERA)) ==
             PackageManager.PERMISSION_GRANTED
         if (granted) {
-            requestUsbPermission(pending.first, pending.second)
+            // Don't call straight into UsbManager.requestPermission() from
+            // inside this callback: the Activity is still mid-transition
+            // from dismissing the CAMERA dialog and may not be RESUMED yet,
+            // which can make the system silently fail to show the USB
+            // permission dialog at all. Defer to the next main-loop pass so
+            // the Activity has settled first.
+            activity?.window?.decorView?.post {
+                requestUsbPermission(pending.first, pending.second)
+            } ?: pending.second.success(false)
         } else {
             pending.second.success(false)
         }

@@ -161,8 +161,10 @@ class _SendToCameraCardState extends State<SendToCameraCard> {
 
   String _message(Object e) {
     final s = e.toString();
-    final msg = s.replaceFirst('TransportError: ', '').replaceFirst(
-        'StateError: ', '').replaceFirst('MtpOperationError: ', '');
+    final msg = s
+        .replaceFirst('transport error: ', '')
+        .replaceFirst('Bad state: ', '')
+        .replaceFirst('camera rejected the operation: ', '');
     return msg;
   }
 
